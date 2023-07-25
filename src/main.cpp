@@ -9,8 +9,8 @@
 #include <WiFi.h>
 
 //Conectar a wifi
-const char* ssid = "nombre_de_tu_red"; 
-const char* password = "contraseña_de_tu_red"; 
+const char* ssid = "Microcontroladores"; 
+const char* password = "raspy123"; 
 
 // Crear vectores
 std::vector<float> listSpO2;
@@ -123,10 +123,10 @@ void loop() {
       Serial.println("ºC");
       
       // Store values in lists if they meet the condition
-      if (spo2 > 50) {
+      if (spo2 > 0 & spo2 < 100) {
         listSpO2.push_back(spo2);
       }
-      if (heartRate > 40) {
+      if (heartRate > 30 & heartRate < 250) {
         listHeartRate.push_back(heartRate);
       } 
       listTPaciente.push_back(TPaciente);
@@ -173,7 +173,7 @@ void loop() {
       paciente.addField("heart_rate", avgHeartRate);
       paciente.addField("tem_paciente", avgTPaciente);
       paciente.addField("tem_ambiente", avgTAmbiente);
-      paciente.addField("id", "your_unique_id"); // Replace "your_unique_id" with your unique identifier
+      paciente.addField("id", "0932065253"); // Replace "your_unique_id" with your unique identifier
 
       // Print the line protocol of the point (for debugging purposes)
       Serial.print("Writing: ");
