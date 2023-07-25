@@ -1,21 +1,16 @@
-// Include libraries
-#include <HTTPClient.h>
 #include <Arduino.h>
+#include <InfluxDbClient.h>
 #include "MAX30100_PulseOximeter.h"
 #include <Wire.h>
 #include <Adafruit_SSD1306.h>
 #include "MAX30105.h"
-#include "spo2_algorithm.h"
-#include "heartRate.h"
 #include <Adafruit_MLX90614.h>
 #include <vector>
 #include <WiFi.h>
-#include "InfluxDB.h"
-
 
 //Conectar a wifi
-const char* ssid     = "NETLIFE-ENRIQUEZ"; 
-const char* password = "kendy1998"; 
+const char* ssid = "nombre_de_tu_red"; 
+const char* password = "contraseña_de_tu_red"; 
 
 // Crear vectores
 std::vector<float> listSpO2;
@@ -36,10 +31,31 @@ Adafruit_MLX90614 mlx = Adafruit_MLX90614();
 // Variable de tiempo 
 int tiempo = 0;
 
+// InfluxDB server URL. Don't use localhost, always use server name or IP address.
+#define INFLUXDB_URL "http://200.126.14.234:8086/"
+// InfluxDB 2 server or cloud API authentication token
+#define INFLUXDB_TOKEN "5KycwxL5zMvN7b4fzQpawwYz7fHeMTMW"
+// InfluxDB 2 organization ID
+#define INFLUXDB_ORG "detect"
+// InfluxDB 2 bucket name
+#define INFLUXDB_BUCKET "IndicadoresSalud"
 
+// InfluxDB client instance
+InfluxDBClient client(INFLUXDB_URL, INFLUXDB_ORG, INFLUXDB_BUCKET, INFLUXDB_TOKEN);
+
+// Data point
+Point paciente("Paciente");
+
+// Function to calculate the average of a vector
+float average(std::vector<float>& v) {
+  float sum = 0;
+  for (int i = 0; i < v.size(); i++) {
+    sum += v[i];
+  }
+  return sum / v.size();
+}
 
 void setup() {
-
   // Initialize serial communication
   Serial.begin(9600);
 
@@ -55,6 +71,7 @@ void setup() {
   // Show the IP address of ESP32 when it's successfully connected
   Serial.println("Connected to WiFi");
   Serial.println(WiFi.localIP());
+
   // Initialize temperature sensor
   mlx.begin();
 
@@ -74,15 +91,6 @@ void setup() {
   particleSensor.setPulseAmplitudeRed(0x0A);
   particleSensor.setPulseAmplitudeGreen(0);
 }
-// Function to calculate the average of a vector
-float average(std::vector<float>& v) {
-  float sum = 0;
-  for(int i = 0; i < v.size(); i++)
-  {
-    sum += v[i];
-  }
-  return sum / v.size();
-}
 
 void loop() {
   // Update oximeter values
@@ -94,10 +102,9 @@ void loop() {
   // Check if a finger is on the sensor
   String fingerStatus = irValue < 50000 ? "DEDO NO DETECTADO" : "DEDO DETECTADO";
   
-  if(fingerStatus == "DEDO DETECTADO"){
-
-    if (tiempo < 30){
-      //Get heart rate and SpO2
+  if (fingerStatus == "DEDO DETECTADO") {
+    if (tiempo < 30) {
+      // Get heart rate and SpO2
       float heartRate = pox.getHeartRate();
       Serial.print("Heart Rate = ");
       Serial.print(heartRate);
@@ -116,15 +123,14 @@ void loop() {
       Serial.println("ºC");
       
       // Store values in lists if they meet the condition
-        if(spo2 > 50) {
-          listSpO2.push_back(spo2);
-        }
-        if(heartRate > 40) {
+      if (spo2 > 50) {
+        listSpO2.push_back(spo2);
+      }
+      if (heartRate > 40) {
         listHeartRate.push_back(heartRate);
-        } 
-        listTPaciente.push_back(TPaciente);
-        listTAmbiente.push_back(TAmbiente);
-
+      } 
+      listTPaciente.push_back(TPaciente);
+      listTAmbiente.push_back(TAmbiente);
 
       // Display values on the OLED screen
       display.clearDisplay();
@@ -139,27 +145,21 @@ void loop() {
       // Wait before looping again
       delay(1000);
       tiempo += 1;
-    }
-    else {
-        
-
+    } else {
       // Calculate and print averages
-      if (!listSpO2.empty()) {
-        Serial.print("Promedio SpO2 = ");
-        Serial.println(average(listSpO2));
-      }
-      if (!listHeartRate.empty()) {
-        Serial.print("Promedio Heart Rate = ");
-        Serial.println(average(listHeartRate));
-      }
-      if (!listTPaciente.empty()) {
-        Serial.print("Promedio TPaciente = ");
-        Serial.println(average(listTPaciente));
-      }
-      if (!listTAmbiente.empty()) {
-        Serial.print("Promedio TAmbiente = ");
-        Serial.println(average(listTAmbiente));
-      }
+      float avgSpO2 = average(listSpO2);
+      float avgHeartRate = average(listHeartRate);
+      float avgTPaciente = average(listTPaciente);
+      float avgTAmbiente = average(listTAmbiente);
+
+      Serial.print("Promedio SpO2 = ");
+      Serial.println(avgSpO2);
+      Serial.print("Promedio Heart Rate = ");
+      Serial.println(avgHeartRate);
+      Serial.print("Promedio TPaciente = ");
+      Serial.println(avgTPaciente);
+      Serial.print("Promedio TAmbiente = ");
+      Serial.println(avgTAmbiente);
 
       // Clear the vectors for the next run
       listSpO2.clear();
@@ -167,27 +167,27 @@ void loop() {
       listTPaciente.clear();
       listTAmbiente.clear();
 
-      // Wait before looping again
-      tiempo=0;
-      display.clearDisplay();
-      display.setCursor(0, 0);
-      display.println("ENVIANDO DATOS");
-      display.println("AL DOCTOR");
-      display.println("ESPERE 10 SEGUNDOS");
-      display.println("RETIRE EL DEDO");
-      display.display();
-      delay(10000);
-      tiempo=0;
+      // Create a point with the average values
+      paciente.clearFields();
+      paciente.addField("spo2", avgSpO2);
+      paciente.addField("heart_rate", avgHeartRate);
+      paciente.addField("tem_paciente", avgTPaciente);
+      paciente.addField("tem_ambiente", avgTAmbiente);
+      paciente.addField("id", "your_unique_id"); // Replace "your_unique_id" with your unique identifier
+
+      // Print the line protocol of the point (for debugging purposes)
+      Serial.print("Writing: ");
+      Serial.println(client.pointToLineProtocol(paciente));
+
+      // Send data to InfluxDB
+      if (client.writePoint(paciente)) {
+        Serial.println("Data sent to InfluxDB");
+      } else {
+        Serial.println("Failed to send data to InfluxDB.");
+      }
+
+      // Reset the time counter
+      tiempo = 0;
     }
-     
   }
-  else{
-      display.clearDisplay();
-      display.setCursor(0, 0);
-      display.println("COLOCA TU DEDO ");
-      display.println("POR 30 SEGUNDOS ");
-      display.println("POR FAVOR ");
-      display.println("Status: " + fingerStatus);
-      display.display();
-  } 
 }
