@@ -9,8 +9,8 @@
 #include <WiFi.h>
 
 //Conectar a wifi
-const char* ssid = "Microcontroladores"; 
-const char* password = "raspy123"; 
+const char* ssid = "Lab_Avanzadas"; 
+const char* password = "la1bo2ra3to4ri5o"; 
 
 // Crear vectores
 std::vector<float> listSpO2;
@@ -44,7 +44,7 @@ int tiempo = 0;
 InfluxDBClient client(INFLUXDB_URL, INFLUXDB_ORG, INFLUXDB_BUCKET, INFLUXDB_TOKEN);
 
 // Data point
-Point paciente("Paciente");
+Point paciente("1105706277");
 
 // Function to calculate the average of a vector
 float average(std::vector<float>& v) {
@@ -173,21 +173,38 @@ void loop() {
       paciente.addField("heart_rate", avgHeartRate);
       paciente.addField("tem_paciente", avgTPaciente);
       paciente.addField("tem_ambiente", avgTAmbiente);
-      paciente.addField("id", "0932065253"); // Replace "your_unique_id" with your unique identifier
 
       // Print the line protocol of the point (for debugging purposes)
       Serial.print("Writing: ");
       Serial.println(client.pointToLineProtocol(paciente));
 
-      // Send data to InfluxDB
-      if (client.writePoint(paciente)) {
-        Serial.println("Data sent to InfluxDB");
-      } else {
-        Serial.println("Failed to send data to InfluxDB.");
+      // Write point to InfluxDB
+      if (!client.writePoint(paciente)) {
+        Serial.print("InfluxDB write failed: ");
+        Serial.println(client.getLastErrorMessage());
       }
-
+  
       // Reset the time counter
       tiempo = 0;
+      display.clearDisplay();
+      display.setCursor(0, 0);
+      display.println("ENVIANDO DATOS");
+      display.println("AL DOCTOR");
+      display.println("ESPERE 10 SEGUNDOS");
+      display.println("RETIRE EL DEDO");
+      display.display();
+      delay(10000);
     }
+  }else {
+
+    display.clearDisplay();
+    display.setCursor(0, 0);
+    display.println("COLOCA TU DEDO ");
+    display.println("POR 30 SEGUNDOS ");
+    display.println("POR FAVOR ");
+    display.println("Status: " + fingerStatus);
+    display.display();
+
   }
+  
 }
