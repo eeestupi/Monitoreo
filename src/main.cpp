@@ -9,8 +9,8 @@
 #include <WiFi.h>
 
 //Conectar a wifi
-const char* ssid = "Lab_Avanzadas"; 
-const char* password = "la1bo2ra3to4ri5o"; 
+const char* ssid = "NETLIFE-ENRIQUEZ"; 
+const char* password = "Kendy1998"; 
 
 // Crear vectores
 std::vector<float> listSpO2;
